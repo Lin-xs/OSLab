@@ -1,6 +1,26 @@
-## Chapter 4  Traps & syscalls
+# Chapter 4  Traps & syscalls
 ---
 三种情况会使得cpu搁置普通代码的执行，转到处理此事件的特殊代码：
 1. 用户程序执行`ecall`（即系统调用）
 2. `exception`异常，如除以零等非法操作
 3. 中断，当外设发出信号，比如硬盘读写请求
+
+统一使用术语“陷入”(`trap`)来描述这些问题。一般来说`trap`的时候执行的命令都要在之后重新运行，并且不需要知道是否发生了特殊的事件。
+
+`xv6`陷入处理有四步：
+1. `RISC-V CPU`进行硬件动作
+2. 一个用来为内核`C`代码准备道路的编译向量(`assembly vector`)
+3. 一个决定做什么的处理程序
+4. 系统调用或者设备驱动服务例程(device-driver service routine).
+
+尽管看起来可以用单一的code path处理这些，但是分为三种独立的编译向量和陷入处理程序看起来更方便：
+1. 来自用户空间的trap
+2. 来自内核空间的trap
+3. 来自计时器的中断
+
+## RISC-V陷入机制
+每个RISC-V CPU都有一组控制寄存器，内核可以通过写这些寄存器告诉CPU如何处理陷入，内核也可以读取寄存器来确定到底发生了何种陷入。在`\kernel\riscv.h:1`中包含了完整的内容。一些最重要的寄存器如下：
+1. `stvec`:内核于此写入其`trap handler`.RISC-V跳转到这里来处理trap.
+2. `sepc`:当trap发生时，RISC-V于此保存原来的程序计数器（因为随后`pc`就会更改为`stvec`）.从trap返回时，`sret`指令将`spec`写入`pc`.内核可以通过写`sepc`来控制`sret`的走向。
+3. `scause`:记录trap发生原因代表的数字
+4. `sscratch`:
